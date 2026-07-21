@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Drift trace JSONL record v1",
+  "description": "Validate each JSONL line against this record union; ordering invariants are validated by the CLI.",
+  "oneOf": [
+    {"$ref": "#/$defs/session"},
+    {"$ref": "#/$defs/message"},
+    {"$ref": "#/$defs/tool_call"},
+    {"$ref": "#/$defs/tool_result"},
+    {"$ref": "#/$defs/state"},
+    {"$ref": "#/$defs/task_update"},
+    {"$ref": "#/$defs/outcome"}
+  ],
+  "$defs": {
+    "extensions": {"type": "object", "additionalProperties": true},
+    "id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*[^\\s\\u0000-\\u001F\\u007F-\\u009F\\uFEFF][^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*$"},
+    "actor_message": {"type": "string", "maxLength": 256, "pattern": "^(agent|user|system|environment)(:[^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*[^\\s\\u0000-\\u001F\\u007F-\\u009F\\uFEFF][^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*)?$"},
+    "actor_call": {"type": "string", "maxLength": 256, "pattern": "^(agent|system)(:[^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*[^\\s\\u0000-\\u001F\\u007F-\\u009F\\uFEFF][^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*)?$"},
+    "actor_observation": {"type": "string", "maxLength": 256, "pattern": "^(tool|system|environment)(:[^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*[^\\s\\u0000-\\u001F\\u007F-\\u009F\\uFEFF][^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*)?$"},
+    "actor_task_update": {"type": "string", "maxLength": 256, "pattern": "^(user|system)(:[^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*[^\\s\\u0000-\\u001F\\u007F-\\u009F\\uFEFF][^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*)?$"},
+    "actor_outcome": {"type": "string", "maxLength": 256, "pattern": "^(tool|system|environment|user)(:[^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*[^\\s\\u0000-\\u001F\\u007F-\\u009F\\uFEFF][^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*)?$"},
+    "at": {"oneOf": [{"type": "null"}, {"type": "string", "minLength": 1, "pattern": ".*\\S.*"}]},
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "schema", "id", "task"],
+      "properties": {
+        "kind": {"type": "string", "const": "session"},
+        "schema": {"type": "string", "const": "drift.trace/v1"},
+        "id": {"$ref": "#/$defs/id"},
+        "task": {"type": "string", "minLength": 1, "pattern": ".*\\S.*"},
+        "constraints": {"type": "array", "maxItems": 256, "items": {"type": "string"}},
+        "success_criteria": {"type": "array", "maxItems": 256, "items": {"type": "string"}},
+        "completeness": {"type": "string", "enum": ["complete", "partial", "unknown"]},
+        "source": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["adapter", "adapter_version", "trust"],
+              "properties": {
+                "adapter": {"$ref": "#/$defs/id"},
+                "adapter_version": {"$ref": "#/$defs/id"},
+                "trust": {"type": "string", "enum": ["adapter_asserted", "unverified"]},
+                "session_id": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]}
+              }
+            }
+          ]
+        },
+        "extensions": {"$ref": "#/$defs/extensions"}
+      }
+    },
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "actor", "text"],
+      "properties": {
+        "kind": {"type": "string", "const": "message"},
+        "id": {"$ref": "#/$defs/id"},
+        "actor": {"$ref": "#/$defs/actor_message"},
+        "text": {"type": "string"},
+        "at": {"$ref": "#/$defs/at"},
+        "duration_ms": {"type": ["integer", "null"], "minimum": 0, "maximum": 18446744073709551615},
+        "extensions": {"$ref": "#/$defs/extensions"}
+      }
+    },
+    "tool_call": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "actor", "call_id", "name", "input"],
+      "properties": {
+        "kind": {"type": "string", "const": "tool_call"},
+        "id": {"$ref": "#/$defs/id"},
+        "actor": {"$ref": "#/$defs/actor_call"},
+        "call_id": {"$ref": "#/$defs/id"},
+        "name": {"$ref": "#/$defs/id"},
+        "input": true,
+        "at": {"$ref": "#/$defs/at"},
+        "duration_ms": {"type": ["integer", "null"], "minimum": 0, "maximum": 18446744073709551615},
+        "extensions": {"$ref": "#/$defs/extensions"}
+      }
+    },
+    "tool_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "actor", "call_id", "status", "output"],
+      "properties": {
+        "kind": {"type": "string", "const": "tool_result"},
+        "id": {"$ref": "#/$defs/id"},
+        "actor": {"$ref": "#/$defs/actor_observation"},
+        "call_id": {"$ref": "#/$defs/id"},
+        "status": {"type": "string", "enum": ["ok", "error", "unknown"]},
+        "output": true,
+        "at": {"$ref": "#/$defs/at"},
+        "duration_ms": {"type": ["integer", "null"], "minimum": 0, "maximum": 18446744073709551615},
+        "extensions": {"$ref": "#/$defs/extensions"}
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "actor", "values"],
+      "properties": {
+        "kind": {"type": "string", "const": "state"},
+        "id": {"$ref": "#/$defs/id"},
+        "actor": {"$ref": "#/$defs/actor_observation"},
+        "values": {"type": "object"},
+        "at": {"$ref": "#/$defs/at"},
+        "extensions": {"$ref": "#/$defs/extensions"}
+      }
+    },
+    "task_update": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "actor", "mode", "text"],
+      "properties": {
+        "kind": {"type": "string", "const": "task_update"},
+        "id": {"$ref": "#/$defs/id"},
+        "actor": {"$ref": "#/$defs/actor_task_update"},
+        "mode": {"type": "string", "enum": ["add", "replace", "clarify"]},
+        "text": {"type": "string"},
+        "at": {"$ref": "#/$defs/at"},
+        "extensions": {"$ref": "#/$defs/extensions"}
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "actor", "status", "text"],
+      "properties": {
+        "kind": {"type": "string", "const": "outcome"},
+        "id": {"$ref": "#/$defs/id"},
+        "actor": {"$ref": "#/$defs/actor_outcome"},
+        "status": {"type": "string", "enum": ["success", "partial", "failure", "unknown"]},
+        "text": {"type": "string"},
+        "at": {"$ref": "#/$defs/at"},
+        "extensions": {"$ref": "#/$defs/extensions"}
+      }
+    }
+  }
+}

@@ -1,0 +1,2 @@
+{"kind":"session","schema":"drift.trace/v1","id":"cwd-quote","task":"Check CI for the repository.","completeness":"partial","source":{"adapter":"example","adapter_version":"1","trust":"unverified"}}
+{"kind":"message","id":"e1","actor":"agent","text":"cwd had drifted into .scratch/m41a. Let me fix that and check CI."}

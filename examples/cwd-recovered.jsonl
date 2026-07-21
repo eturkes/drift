@@ -1,0 +1,8 @@
+{"kind":"session","schema":"drift.trace/v1","id":"cwd-recovered","task":"Check CI for the repository.","success_criteria":["CI completes from the repository root."],"completeness":"complete","source":{"adapter":"example","adapter_version":"1","trust":"adapter_asserted"}}
+{"kind":"tool_call","id":"e1","actor":"agent","call_id":"c1","name":"shell","input":{"cmd":"pwd"}}
+{"kind":"tool_result","id":"e2","actor":"tool","call_id":"c1","status":"ok","output":"/repo/.scratch/m41a"}
+{"kind":"message","id":"e3","actor":"agent","text":"cwd had drifted into .scratch/m41a. Let me fix that and check CI."}
+{"kind":"tool_call","id":"e4","actor":"agent","call_id":"c2","name":"shell","input":{"cmd":"cd /repo && make ci"}}
+{"kind":"tool_result","id":"e5","actor":"tool","call_id":"c2","status":"ok","output":"CI passed"}
+{"kind":"state","id":"e6","actor":"tool","values":{"cwd":"/repo"}}
+{"kind":"outcome","id":"e7","actor":"tool","status":"success","text":"CI passed from /repo."}

@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Drift report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "trace", "analysis", "burden", "overview", "summary", "rerun",
+    "incidents", "gaps", "validation_warnings"
+  ],
+  "properties": {
+    "schema": {"type": "string", "const": "drift.report/v1"},
+    "trace": {"$ref": "#/$defs/trace_snapshot"},
+    "analysis": {"$ref": "#/$defs/analysis"},
+    "burden": {"$ref": "#/$defs/burden"},
+    "overview": {"$ref": "#/$defs/prose"},
+    "summary": {"$ref": "#/$defs/summary"},
+    "rerun": {"$ref": "#/$defs/rerun"},
+    "incidents": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/incident"}},
+    "gaps": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/prose"}},
+    "validation_warnings": {"type": "array", "maxItems": 1024, "items": {"$ref": "#/$defs/prose"}}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*[^\\s\\u0000-\\u001F\\u007F-\\u009F\\uFEFF][^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*$"},
+    "prose": {"type": "string", "minLength": 1, "maxLength": 4000, "pattern": ".*\\S.*"},
+    "extensions": {"type": "object", "additionalProperties": true},
+    "actor_message": {"type": "string", "maxLength": 256, "pattern": "^(agent|user|system|environment)(:[^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*[^\\s\\u0000-\\u001F\\u007F-\\u009F\\uFEFF][^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*)?$"},
+    "actor_call": {"type": "string", "maxLength": 256, "pattern": "^(agent|system)(:[^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*[^\\s\\u0000-\\u001F\\u007F-\\u009F\\uFEFF][^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*)?$"},
+    "actor_observation": {"type": "string", "maxLength": 256, "pattern": "^(tool|system|environment)(:[^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*[^\\s\\u0000-\\u001F\\u007F-\\u009F\\uFEFF][^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*)?$"},
+    "actor_task_update": {"type": "string", "maxLength": 256, "pattern": "^(user|system)(:[^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*[^\\s\\u0000-\\u001F\\u007F-\\u009F\\uFEFF][^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*)?$"},
+    "actor_outcome": {"type": "string", "maxLength": 256, "pattern": "^(tool|system|environment|user)(:[^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*[^\\s\\u0000-\\u001F\\u007F-\\u009F\\uFEFF][^\\u0000-\\u001F\\u007F-\\u009F\\uFEFF]*)?$"},
+
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter", "adapter_version", "trust"],
+      "properties": {
+        "adapter": {"$ref": "#/$defs/id"},
+        "adapter_version": {"$ref": "#/$defs/id"},
+        "trust": {"type": "string", "enum": ["adapter_asserted", "unverified"]},
+        "session_id": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]}
+      }
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "schema", "id", "task"],
+      "properties": {
+        "kind": {"type": "string", "const": "session"},
+        "schema": {"type": "string", "const": "drift.trace/v1"},
+        "id": {"$ref": "#/$defs/id"},
+        "task": {"type": "string", "minLength": 1, "pattern": ".*\\S.*"},
+        "constraints": {"type": "array", "maxItems": 256, "items": {"type": "string"}},
+        "success_criteria": {"type": "array", "maxItems": 256, "items": {"type": "string"}},
+        "completeness": {"type": "string", "enum": ["complete", "partial", "unknown"]},
+        "source": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/source"}]},
+        "extensions": {"$ref": "#/$defs/extensions"}
+      }
+    },
+    "at": {"oneOf": [{"type": "null"}, {"type": "string", "minLength": 1, "pattern": ".*\\S.*"}]},
+    "duration": {"type": ["integer", "null"], "minimum": 0, "maximum": 18446744073709551615},
+    "message": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "id", "actor", "text"],
+      "properties": {
+        "kind": {"type": "string", "const": "message"}, "id": {"$ref": "#/$defs/id"},
+        "actor": {"$ref": "#/$defs/actor_message"}, "text": {"type": "string"},
+        "at": {"$ref": "#/$defs/at"}, "duration_ms": {"$ref": "#/$defs/duration"},
+        "extensions": {"$ref": "#/$defs/extensions"}
+      }
+    },
+    "tool_call": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "id", "actor", "call_id", "name", "input"],
+      "properties": {
+        "kind": {"type": "string", "const": "tool_call"}, "id": {"$ref": "#/$defs/id"},
+        "actor": {"$ref": "#/$defs/actor_call"}, "call_id": {"$ref": "#/$defs/id"},
+        "name": {"$ref": "#/$defs/id"}, "input": true, "at": {"$ref": "#/$defs/at"},
+        "duration_ms": {"$ref": "#/$defs/duration"}, "extensions": {"$ref": "#/$defs/extensions"}
+      }
+    },
+    "tool_result": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "id", "actor", "call_id", "status", "output"],
+      "properties": {
+        "kind": {"type": "string", "const": "tool_result"}, "id": {"$ref": "#/$defs/id"},
+        "actor": {"$ref": "#/$defs/actor_observation"}, "call_id": {"$ref": "#/$defs/id"},
+        "status": {"type": "string", "enum": ["ok", "error", "unknown"]}, "output": true,
+        "at": {"$ref": "#/$defs/at"}, "duration_ms": {"$ref": "#/$defs/duration"},
+        "extensions": {"$ref": "#/$defs/extensions"}
+      }
+    },
+    "state": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "id", "actor", "values"],
+      "properties": {
+        "kind": {"type": "string", "const": "state"}, "id": {"$ref": "#/$defs/id"},
+        "actor": {"$ref": "#/$defs/actor_observation"}, "values": {"type": "object"},
+        "at": {"$ref": "#/$defs/at"}, "extensions": {"$ref": "#/$defs/extensions"}
+      }
+    },
+    "task_update": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "id", "actor", "mode", "text"],
+      "properties": {
+        "kind": {"type": "string", "const": "task_update"}, "id": {"$ref": "#/$defs/id"},
+        "actor": {"$ref": "#/$defs/actor_task_update"},
+        "mode": {"type": "string", "enum": ["add", "replace", "clarify"]},
+        "text": {"type": "string"}, "at": {"$ref": "#/$defs/at"},
+        "extensions": {"$ref": "#/$defs/extensions"}
+      }
+    },
+    "outcome": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "id", "actor", "status", "text"],
+      "properties": {
+        "kind": {"type": "string", "const": "outcome"}, "id": {"$ref": "#/$defs/id"},
+        "actor": {"$ref": "#/$defs/actor_outcome"},
+        "status": {"type": "string", "enum": ["success", "partial", "failure", "unknown"]},
+        "text": {"type": "string"}, "at": {"$ref": "#/$defs/at"},
+        "extensions": {"$ref": "#/$defs/extensions"}
+      }
+    },
+    "event": {
+      "oneOf": [
+        {"$ref": "#/$defs/message"}, {"$ref": "#/$defs/tool_call"},
+        {"$ref": "#/$defs/tool_result"}, {"$ref": "#/$defs/state"},
+        {"$ref": "#/$defs/task_update"}, {"$ref": "#/$defs/outcome"}
+      ]
+    },
+    "trace_snapshot": {
+      "type": "object", "additionalProperties": false,
+      "required": ["input_digest", "normalized_digest", "parser_warnings", "session", "events"],
+      "properties": {
+        "input_digest": {"$ref": "#/$defs/hash"}, "normalized_digest": {"$ref": "#/$defs/hash"},
+        "parser_warnings": {"type": "array", "maxItems": 100000, "items": {"type": "string"}},
+        "session": {"$ref": "#/$defs/session"},
+        "events": {"type": "array", "maxItems": 50000, "items": {"$ref": "#/$defs/event"}}
+      }
+    },
+
+    "analysis": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "drift_version", "rubric", "rubric_digest", "rubric_source", "judgment_schema_digest",
+        "judgment_schema_source", "judgment_digest",
+        "judge", "codex_cli", "model", "thread_id", "generated_at_unix_ms", "attempts"
+      ],
+      "properties": {
+        "drift_version": {"type": "string", "minLength": 1}, "rubric": {"type": "string", "minLength": 1},
+        "rubric_digest": {"$ref": "#/$defs/hash"}, "rubric_source": {"type": "string", "minLength": 1, "maxLength": 262144},
+        "judgment_schema_digest": {"$ref": "#/$defs/hash"},
+        "judgment_schema_source": {"type": "string", "minLength": 2, "maxLength": 1048576},
+        "judgment_digest": {"$ref": "#/$defs/hash"}, "judge": {"type": "string", "minLength": 1},
+        "codex_cli": {"type": "string", "minLength": 1}, "model": {"type": "string", "minLength": 1},
+        "thread_id": {"type": "string", "minLength": 1},
+        "generated_at_unix_ms": {"type": "integer", "minimum": 0},
+        "attempts": {"type": "integer", "minimum": 1, "maximum": 3}
+      }
+    },
+    "event_span": {
+      "type": "object", "additionalProperties": false,
+      "required": ["first_event_id", "last_event_id", "inclusive_event_count"],
+      "properties": {
+        "first_event_id": {"$ref": "#/$defs/id"}, "last_event_id": {"$ref": "#/$defs/id"},
+        "inclusive_event_count": {"type": "integer", "minimum": 1}
+      }
+    },
+    "episode_burden": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "incident_id", "affected_event_count", "affected_agent_action_count",
+        "affected_tool_result_count", "known_duration_ms", "duration_event_count", "span"
+      ],
+      "properties": {
+        "incident_id": {"$ref": "#/$defs/id"}, "affected_event_count": {"type": "integer", "minimum": 0},
+        "affected_agent_action_count": {"type": "integer", "minimum": 0},
+        "affected_tool_result_count": {"type": "integer", "minimum": 0},
+        "known_duration_ms": {"type": "integer", "minimum": 0},
+        "duration_event_count": {"type": "integer", "minimum": 0},
+        "span": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/event_span"}]}
+      }
+    },
+    "burden": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "attributed_event_count", "attributed_agent_action_count", "attributed_tool_result_count",
+        "known_duration_ms", "duration_event_count", "episodes"
+      ],
+      "properties": {
+        "attributed_event_count": {"type": "integer", "minimum": 0},
+        "attributed_agent_action_count": {"type": "integer", "minimum": 0},
+        "attributed_tool_result_count": {"type": "integer", "minimum": 0},
+        "known_duration_ms": {"type": "integer", "minimum": 0},
+        "duration_event_count": {"type": "integer", "minimum": 0},
+        "episodes": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/episode_burden"}}
+      }
+    },
+
+    "summary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["task_outcome", "outcome_reason", "outcome_evidence", "trajectory", "trajectory_reason", "confidence"],
+      "properties": {
+        "task_outcome": {"type": "string", "enum": ["trace_supported_success", "claimed_success", "partial", "failure", "unknown"]},
+        "outcome_reason": {"$ref": "#/$defs/prose"},
+        "outcome_evidence": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/id"}},
+        "trajectory": {"type": "string", "enum": ["clean", "recovered_detour", "unrecovered_detour", "derailed", "unknown"]},
+        "trajectory_reason": {"$ref": "#/$defs/prose"},
+        "confidence": {"type": "string", "enum": ["low", "medium", "high"]}
+      }
+    },
+    "rerun": {
+      "type": "object", "additionalProperties": false,
+      "required": ["recommendation", "reason", "prerequisites", "inspect", "follow_up"],
+      "properties": {
+        "recommendation": {"type": "string", "enum": ["keep", "rerun", "inspect", "unknown"]},
+        "reason": {"$ref": "#/$defs/prose"},
+        "prerequisites": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/prose"}},
+        "inspect": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/prose"}},
+        "follow_up": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/prose"}}
+      }
+    },
+    "lifecycle": {
+      "type": "object", "additionalProperties": false,
+      "required": ["onset", "detected", "recovery_started", "recovery_confirmed"],
+      "properties": {
+        "onset": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]},
+        "detected": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]},
+        "recovery_started": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]},
+        "recovery_confirmed": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]}
+      }
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["event_id", "basis", "supports", "excerpt"],
+      "properties": {
+        "event_id": {"$ref": "#/$defs/id"},
+        "basis": {"type": "string", "enum": ["agent_action", "tool_observation", "state_observation", "task_update_observation", "outcome_observation", "agent_report", "user_report", "inference"]},
+        "supports": {"type": "string", "minLength": 1, "maxLength": 1000, "pattern": ".*\\S.*"},
+        "excerpt": {"type": "string", "minLength": 1, "maxLength": 240}
+      }
+    },
+    "incident": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "id", "title", "category", "task_relation", "cause", "severity", "status", "task_effect",
+        "lifecycle", "affected_events", "evidence", "causal_unknowns", "unknowns", "rerun_relevance"
+      ],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"}, "title": {"type": "string", "minLength": 1, "maxLength": 1000, "pattern": ".*\\S.*"},
+        "category": {"type": "string", "enum": ["context_state", "scope", "wrong_objective", "unrelated_work", "tool_execution", "loop_churn", "coordination", "constraint_or_safety", "other"]},
+        "task_relation": {"type": "string", "enum": ["incidental_detour", "intrinsic_troubleshooting", "legitimate_exploration", "external_friction", "unknown"]},
+        "cause": {"type": "string", "enum": ["agent", "environment", "tool", "user", "external", "inherited", "unknown"]},
+        "severity": {"type": "string", "enum": ["low", "medium", "high", "critical", "unknown"]},
+        "status": {"type": "string", "enum": ["reported", "detected", "recovery_intended", "recovering", "recovered", "completed", "unrecovered", "unknown"]},
+        "task_effect": {"type": "string", "enum": ["delay", "rework", "state_risk", "artifact_risk", "outcome_risk", "none", "unknown"]},
+        "lifecycle": {"$ref": "#/$defs/lifecycle"},
+        "affected_events": {"type": "array", "minItems": 1, "maxItems": 512, "items": {"$ref": "#/$defs/id"}},
+        "evidence": {"type": "array", "minItems": 1, "maxItems": 32, "items": {"$ref": "#/$defs/evidence"}},
+        "causal_unknowns": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/prose"}},
+        "unknowns": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/prose"}},
+        "rerun_relevance": {"$ref": "#/$defs/prose"}
+      }
+    }
+  }
+}
