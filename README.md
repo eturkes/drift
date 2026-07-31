@@ -22,7 +22,7 @@ Evidence ceiling: outcome=unknown | trajectory=unknown | judge-confidence=high |
 Decision-limiting gaps
   - No tool, state, or outcome record confirms recovery or CI.
 
-Judge-attributed incident coverage: 1/1 session events | 0 agent tool calls | 0 tool results |
+Judge-attributed incident coverage: 1/1 session events | 0/0 agent tool calls | 0/0 tool results |
   duration unavailable
 
 Incidents (1)
@@ -33,24 +33,74 @@ Incidents (1)
 
 ## Use
 
-Prerequisites: Rust 1.88+ and an authenticated Codex CLI. The invocation is compatibility-tested
-with Codex CLI 0.144.6 and deliberately fails closed if its strict flags or JSONL protocol change.
+Prerequisites: Rust 1.88+ and an authenticated Codex CLI. Observer and import protocols are
+compatibility-tested with Codex CLI 0.146.0 and deliberately fail closed when strict flags or JSONL
+shapes change.
 
 ```sh
 cargo build --release
+target/release/drift import codex-exec --task "Inspect the working directory." \
+  -o trace.jsonl examples/codex-exec.source.jsonl
 target/release/drift validate examples/cwd-quote.jsonl
 target/release/drift analyze examples/cwd-quote.jsonl
 target/release/drift analyze --model MODEL -o report.json examples/cwd-recovered.jsonl
 target/release/drift render report.json
 ```
 
-`analyze` prints the human report. `--json` prints report JSON; `-o` atomically writes that same
-self-contained report (mode `0600` on Unix). `render` revalidates embedded trace records, semantic
-invariants, provenance hashes, judgment hash, and derived coverage before printing. `drift schema
-trace|judgment|report` prints a standalone JSON Schema.
+`import` prints strict trace JSONL or atomically writes it with `-o`. `analyze` prints the human
+report. `--json` prints report JSON; `-o` atomically writes that same self-contained report. File
+outputs use mode `0600` on Unix. `render` revalidates embedded trace records, semantic invariants,
+provenance hashes, judgment hash, and derived coverage before printing. `drift schema
+trace|judgment|report` prints a standalone JSON Schema. Input paths accept `-` for stdin.
 
 Exit status reports whether Drift completed successfully, not whether the advisory result is
 `KEEP`, `RERUN`, `INSPECT`, or `UNKNOWN`.
+
+## Codex exec import
+
+Capture the structured stdout stream from a non-interactive Codex turn, then import it with the
+original task and any decision-relevant contract:
+
+```sh
+task='Inspect the repository state and report the test result.'
+codex exec --json "$task" > run.codex.jsonl
+target/release/drift import codex-exec \
+  --task "$task" \
+  --constraint 'Preserve the worktree.' \
+  --success 'Report the executed test and its result.' \
+  -o run.drift.jsonl \
+  run.codex.jsonl
+target/release/drift analyze run.drift.jsonl
+```
+
+Or stream without intermediate files:
+
+```sh
+codex exec --json "$task" \
+  | target/release/drift import codex-exec --task "$task" - \
+  | target/release/drift analyze -
+```
+
+The adapter preserves source item IDs/phases in `extensions`, hashes the exact Codex stream, links
+started/completed calls, and maps:
+
+| Codex item/event | Drift record |
+|---|---|
+| agent message, reasoning | agent `message` |
+| command, file change, MCP, collaboration, web search | linked `tool_call` + `tool_result` |
+| todo list | agent `message` |
+| item or stream error | environment `state` |
+| `turn.failed` | failure `outcome` |
+| `turn.completed` | unknown `outcome` |
+
+`turn.completed` proves only that Codex finished the turn; it cannot establish task success. A
+terminal stream is structurally `complete`; a captured stream without a terminal turn event remains
+`partial`, including unmatched-call warnings. Unknown event/item variants, unknown fields,
+duplicate keys, changed call-identity payloads, and impossible lifecycles are rejected rather than
+omitted.
+
+The task/contract comes from CLI arguments because `codex exec --json` does not include the original
+prompt. The source digest detects later byte changes but is not authentication.
 
 ## Generic trace JSONL
 
@@ -178,8 +228,8 @@ the CLI protocol does not report the resolved model.
 
 ```sh
 cargo fmt --all -- --check
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
+cargo test --all-targets --locked
+cargo clippy --all-targets --locked -- -D warnings
 ```
 
 The interchange is intentionally smaller than current AI telemetry conventions. OpenAI describes

@@ -121,14 +121,17 @@ pub fn render_report(report: &Report) -> String {
         }
     }
 
+    let (agent_action_count, tool_result_count) = coverage_totals(&report.trace.events);
     writeln!(out).unwrap();
     writeln!(
         out,
-        "Judge-attributed incident coverage: {}/{} session events | {} agent tool calls | {} tool results | {}",
+        "Judge-attributed incident coverage: {}/{} session events | {}/{} agent tool calls | {}/{} tool results | {}",
         report.burden.attributed_event_count,
         report.trace.events.len(),
         report.burden.attributed_agent_action_count,
+        agent_action_count,
         report.burden.attributed_tool_result_count,
+        tool_result_count,
         duration_label(
             report.burden.known_duration_ms,
             report.burden.duration_event_count
@@ -181,6 +184,24 @@ pub fn render_report(report: &Report) -> String {
     )
     .unwrap();
     out
+}
+
+fn coverage_totals(events: &[TraceRecord]) -> (usize, usize) {
+    let agent_actions = events
+        .iter()
+        .filter(|event| {
+            matches!(
+                event,
+                TraceRecord::ToolCall { actor, .. }
+                    if actor.split_once(':').map_or(actor.as_str(), |(role, _)| role) == "agent"
+            )
+        })
+        .count();
+    let tool_results = events
+        .iter()
+        .filter(|event| matches!(event, TraceRecord::ToolResult { .. }))
+        .count();
+    (agent_actions, tool_results)
 }
 
 fn render_incident(
@@ -481,8 +502,42 @@ fn decision_label(value: Recommendation) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::inline;
-    use crate::model::SourceTrust;
+    use std::collections::BTreeMap;
+
+    use super::{coverage_totals, inline};
+    use crate::model::{SourceTrust, ToolStatus, TraceRecord};
+
+    #[test]
+    fn coverage_totals_distinguish_agent_calls_from_other_calls() {
+        let call = |id: &str, actor: &str, call_id: &str| TraceRecord::ToolCall {
+            id: id.into(),
+            actor: actor.into(),
+            call_id: call_id.into(),
+            name: "shell".into(),
+            input: serde_json::Value::Null,
+            at: None,
+            duration_ms: None,
+            extensions: BTreeMap::new(),
+        };
+        let result = TraceRecord::ToolResult {
+            id: "e3".into(),
+            actor: "tool".into(),
+            call_id: "c1".into(),
+            status: ToolStatus::Ok,
+            output: serde_json::Value::Null,
+            at: None,
+            duration_ms: None,
+            extensions: BTreeMap::new(),
+        };
+        assert_eq!(
+            coverage_totals(&[
+                call("e1", "agent:worker", "c1"),
+                call("e2", "system", "c2"),
+                result,
+            ]),
+            (1, 1)
+        );
+    }
 
     #[test]
     fn terminal_text_is_single_line_and_control_safe() {

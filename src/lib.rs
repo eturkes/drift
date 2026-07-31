@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+pub mod adapters;
 pub mod aggregate;
 pub mod digest;
 pub mod error;

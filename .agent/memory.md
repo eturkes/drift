@@ -2,6 +2,8 @@
 
 - Intent = post-hoc agent-session observability → human decides keep/inspect/rerun; scores stay secondary/absent.
 - Canonical input = strict ordered `drift.trace/v1` JSONL; adapters normalize agent-native logs.
+- Codex exec adapter = `drift import codex-exec --task ...`; strict current JSONL mapping, exact
+  source digest, terminal→complete, interrupted→partial, `turn.completed`→unknown task outcome.
 - Semantic layer = private-temp/read-only `codex exec`; known tools/context requested off, while
   ambient authenticated runtime/system layers remain → hostile input needs outer isolation.
 - Trusted rubric bytes stay immutable; trace, rejected output, + retry diagnostics remain untrusted
