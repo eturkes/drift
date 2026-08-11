@@ -224,6 +224,35 @@ retain its content. Redact secrets, personal data, and regulated data before `an
 report accordingly. When `--model` is absent, provenance says `unknown (Codex CLI default)` because
 the CLI protocol does not report the resolved model.
 
+## in-progress view
+
+[`plugin/`](plugin/) is a zero-build, self-contained in-progress API 1.0 report view. Configure that
+exact directory as a plugin root. It discovers likely report JSON through `project.tree`, then asks
+the host to render the selected file with the native validator. The iframe never receives raw report
+JSON and cannot run an analysis.
+
+Discovery calls `project.tree` with `{ "depth": 6, "limit": 2000 }`. Candidates are regular JSON
+files under `.drift/`, in a `reports/` directory, or with `drift`/`report` in the filename. Rendering
+uses this RPC:
+
+```json
+{"kind": "request", "id": "…", "method": "drift.render", "params": {"path": "session.drift.json"}}
+```
+
+The successful result is exactly `{ "path": "session.drift.json", "text": "native output…" }`.
+The host must bind the project root, accept only a tree-returnable relative regular-file path,
+reject absolute/traversing/symlink-escaping paths, and invoke `drift render` directly without shell
+interpolation. Return output only after exit zero; cap input, output, and time. Safe RPC errors are
+`Invalid Drift report path`, `Drift report not found`, `Drift report is too large`, `Drift render
+timed out`, `Drift report validation failed`, or `Drift executable unavailable`. The UI surfaces
+errors without branching on their text and inserts native output with `textContent`.
+
+Validate the static package from an in-progress checkout:
+
+```sh
+pnpm plugin:validate -- /absolute/path/to/drift/plugin
+```
+
 ## Development
 
 ```sh

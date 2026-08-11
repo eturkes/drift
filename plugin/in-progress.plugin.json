@@ -1,0 +1,11 @@
+{
+  "apiVersion": "1.0",
+  "id": "drift",
+  "name": "Drift",
+  "version": "0.1.0",
+  "description": "Validated native postmortems for agent-session traces",
+  "entry": "index.html",
+  "assets": [],
+  "icon": "sparkles",
+  "capabilities": ["project.tree", "drift.render"]
+}
