@@ -27,6 +27,8 @@ fn plugin_entry_uses_v1_channel_and_native_render_contract() {
         "apiVersion !== API_VERSION",
         "kind: \"ready\"",
         "const REQUIRED = [\"project.tree\", \"drift.render\"]",
+        "const RPC_TIMEOUT_MS = 20_000;",
+        "}, RPC_TIMEOUT_MS);",
         "call(\"project.tree\", { depth: 6, limit: 2_000 })",
         "call(\"drift.render\", { path })",
         "value.path !== expectedPath",
