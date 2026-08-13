@@ -14,7 +14,12 @@ fn plugin_manifest_is_static_and_versioned() {
     assert_eq!(manifest["assets"], serde_json::json!([]));
     assert_eq!(
         manifest["capabilities"],
-        serde_json::json!(["project.tree", "drift.render", "drift.analyze"])
+        serde_json::json!([
+            "project.tree",
+            "drift.render",
+            "drift.validateTraces",
+            "drift.analyze"
+        ])
     );
     assert!(ENTRY.len() < 100_000);
 }
@@ -26,16 +31,19 @@ fn plugin_entry_uses_v1_channel_and_native_render_contract() {
         "type !== \"in-progress:init\"",
         "apiVersion !== API_VERSION",
         "kind: \"ready\"",
-        "const REQUIRED = [\"project.tree\", \"drift.render\", \"drift.analyze\"]",
+        "const REQUIRED = [\"project.tree\", \"drift.render\", \"drift.validateTraces\", \"drift.analyze\"]",
+        "const MAX_TRACE_CANDIDATES = 32;",
         "const ANALYZE_TIMEOUT_MS = 21 * 60_000;",
         "const ANALYSIS_CANCELED = \"Drift analysis canceled by the user\";",
         "call(\"project.tree\", { depth: 6, limit: 2_000 })",
         "call(\"drift.render\", { path })",
+        "await call(\"drift.validateTraces\", {",
         "call(\"drift.analyze\", { path }, ANALYZE_TIMEOUT_MS)",
         "Analyze trace",
         "Drift trace JSONL",
         "basename.endsWith(\".schema.json\")",
         "basename.endsWith(\".source.jsonl\")",
+        "No valid Drift trace found",
         "value.path !== expectedPath",
         "value.text",
         "output.textContent = report.text",
