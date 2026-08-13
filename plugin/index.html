@@ -115,7 +115,8 @@
         border-bottom: 1px solid var(--line);
       }
 
-      .analysis-bar {
+      .analysis-bar,
+      .import-bar {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
         align-items: end;
@@ -127,6 +128,15 @@
 
       .analysis-bar button {
         min-width: 132px;
+      }
+
+      .import-bar {
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in srgb, var(--amber), transparent 94%);
+      }
+
+      .import-bar button {
+        min-width: 220px;
       }
 
       .field {
@@ -286,7 +296,8 @@
 
         header,
         .toolbar,
-        .analysis-bar {
+        .analysis-bar,
+        .import-bar {
           grid-template-columns: 1fr;
         }
 
@@ -316,12 +327,22 @@
     </main>
     <script type="module">
       const API_VERSION = "1.0";
-      const REQUIRED = ["project.tree", "drift.render", "drift.validateTraces", "drift.analyze"];
+      const REQUIRED = [
+        "project.tree",
+        "drift.render",
+        "drift.validateTraces",
+        "drift.recentSessions",
+        "drift.importSession",
+        "drift.analyze",
+      ];
       const MAX_RENDERED_CHARS = 1_048_576;
       const MAX_TRACE_CANDIDATES = 32;
       const RPC_TIMEOUT_MS = 20_000;
+      const IMPORT_TIMEOUT_MS = 75_000;
       const ANALYZE_TIMEOUT_MS = 21 * 60_000;
       const ANALYSIS_CANCELED = "Drift analysis canceled by the user";
+      const IMPORT_CANCELED = "Drift session import canceled by the user";
+      const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
       const app = document.querySelector("#app");
       const pending = new Map();
       let port;
@@ -420,6 +441,71 @@
         return candidates.filter(({ path }) => valid.has(path));
       }
 
+      function recentCodexSessions(value) {
+        if (
+          !value ||
+          typeof value !== "object" ||
+          Array.isArray(value) ||
+          !Array.isArray(value.sessions) ||
+          value.sessions.length > 20 ||
+          typeof value.truncated !== "boolean"
+        ) {
+          throw new Error("drift.recentSessions returned an invalid result");
+        }
+        const ids = new Set();
+        const sessions = value.sessions.map((session) => {
+          if (
+            !session ||
+            typeof session !== "object" ||
+            Array.isArray(session) ||
+            typeof session.id !== "string" ||
+            !SESSION_ID.test(session.id) ||
+            ids.has(session.id) ||
+            typeof session.startedAt !== "string" ||
+            !Number.isFinite(Date.parse(session.startedAt)) ||
+            typeof session.updatedAt !== "string" ||
+            !Number.isFinite(Date.parse(session.updatedAt)) ||
+            typeof session.source !== "string" ||
+            !/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(session.source) ||
+            !Number.isSafeInteger(session.byteSize) ||
+            session.byteSize < 1 ||
+            session.byteSize > 32 * 1024 * 1024
+          ) {
+            throw new Error("drift.recentSessions returned an invalid session");
+          }
+          ids.add(session.id);
+          return {
+            id: session.id,
+            startedAt: session.startedAt,
+            updatedAt: session.updatedAt,
+            source: session.source,
+            byteSize: session.byteSize,
+          };
+        });
+        return { sessions, truncated: value.truncated };
+      }
+
+      function importedCodexSession(value, expectedId) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) {
+          throw new Error("drift.importSession returned an invalid result");
+        }
+        const expectedPath = `.drift/traces/codex-${expectedId}.drift.jsonl`;
+        const parsed = recentCodexSessions({ sessions: [value.session], truncated: false });
+        if (value.path !== expectedPath || parsed.sessions[0].id !== expectedId) {
+          throw new Error("drift.importSession returned a different session or trace");
+        }
+        return { path: value.path, session: parsed.sessions[0] };
+      }
+
+      function sessionLabel(session) {
+        const when = new Intl.DateTimeFormat(undefined, {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }).format(new Date(session.startedAt));
+        const size = `${(session.byteSize / (1024 * 1024)).toFixed(1)} MiB`;
+        return `${when} · ${session.source} · ${size} · …${session.id.slice(-8)}`;
+      }
+
       function renderedReport(value, expectedPath = null) {
         if (!value || typeof value !== "object" || Array.isArray(value)) {
           throw new Error("drift.render result is not an object");
@@ -461,6 +547,8 @@
         const refresh = document.querySelector("#refresh-reports");
         const analyze = document.querySelector("#analyze-trace");
         const trace = document.querySelector("#trace-select");
+        const importButton = document.querySelector("#import-session");
+        const session = document.querySelector("#session-select");
         output.dataset.state = "loading";
         output.textContent = "Validating and rendering native Drift report…";
         pathLabel.textContent = path;
@@ -469,6 +557,8 @@
         refresh.disabled = true;
         analyze.disabled = true;
         trace.disabled = true;
+        importButton.disabled = true;
+        session.disabled = true;
         setPluginStatus("busy", null, `Drift · ${context.project.name}`);
         try {
           const report = renderedReport(await call("drift.render", { path }), path);
@@ -489,6 +579,8 @@
             refresh.disabled = false;
             analyze.disabled = !trace.value;
             trace.disabled = !trace.value;
+            importButton.disabled = !session.value;
+            session.disabled = !session.value;
           }
         }
       }
@@ -501,12 +593,16 @@
         const reportSelect = document.querySelector("#report-select");
         const render = document.querySelector("#render-report");
         const refresh = document.querySelector("#refresh-reports");
+        const importButton = document.querySelector("#import-session");
+        const session = document.querySelector("#session-select");
         analyze.disabled = true;
         analyze.textContent = "Analyzing…";
         trace.disabled = true;
         reportSelect.disabled = true;
         render.disabled = true;
         refresh.disabled = true;
+        importButton.disabled = true;
+        session.disabled = true;
         body.innerHTML = `<div class="empty" role="status"><strong>Analyzing trace…</strong><p>Drift validates the trace before sending it to Codex. Analysis may take up to 20 minutes, including one repair attempt.</p><code>${escapeHtml(path)}</code></div>`;
         setPluginStatus("busy", null, `Drift · ${context.project.name}`);
         try {
@@ -530,6 +626,58 @@
             reportSelect.disabled = reportSelect.options.length === 0 || !reportSelect.value;
             render.disabled = reportSelect.disabled;
             refresh.disabled = false;
+            importButton.disabled = !session.value;
+            session.disabled = !session.value;
+          }
+        }
+      }
+
+      async function importCodexSession(sessionId) {
+        const generation = ++renderGeneration;
+        const body = document.querySelector("#report-body");
+        const importButton = document.querySelector("#import-session");
+        const session = document.querySelector("#session-select");
+        const analyze = document.querySelector("#analyze-trace");
+        const trace = document.querySelector("#trace-select");
+        const reportSelect = document.querySelector("#report-select");
+        const render = document.querySelector("#render-report");
+        const refresh = document.querySelector("#refresh-reports");
+        importButton.disabled = true;
+        importButton.textContent = "Importing…";
+        session.disabled = true;
+        analyze.disabled = true;
+        trace.disabled = true;
+        reportSelect.disabled = true;
+        render.disabled = true;
+        refresh.disabled = true;
+        body.innerHTML = `<div class="empty" role="status"><strong>Importing Codex session…</strong><p>Drift is converting the selected local session into a private project trace. No model or provider is contacted.</p><code>${escapeHtml(sessionId)}</code></div>`;
+        setPluginStatus("busy", null, `Drift · ${context.project.name}`);
+        try {
+          const imported = importedCodexSession(
+            await call("drift.importSession", { sessionId }, IMPORT_TIMEOUT_MS),
+            sessionId,
+          );
+          if (generation !== renderGeneration) return;
+          await discover(null, null, generation, imported.path);
+        } catch (error) {
+          if (generation !== renderGeneration) return;
+          const message = error instanceof Error ? error.message : String(error);
+          if (message === IMPORT_CANCELED) {
+            await discover(null, null, generation);
+            return;
+          }
+          body.innerHTML = `<div class="empty" role="alert"><strong>Import did not complete</strong><p>${escapeHtml(message)}</p><code>${escapeHtml(sessionId)}</code></div>`;
+          setPluginStatus("error", "ERR", "Drift import unavailable");
+        } finally {
+          if (generation === renderGeneration) {
+            importButton.disabled = false;
+            importButton.textContent = "Import recent Codex session";
+            session.disabled = false;
+            analyze.disabled = !trace.value;
+            trace.disabled = !trace.value;
+            reportSelect.disabled = !reportSelect.value;
+            render.disabled = !reportSelect.value;
+            refresh.disabled = false;
           }
         }
       }
@@ -537,27 +685,46 @@
       function renderConsole(
         reports,
         traces,
+        sessions,
         truncated,
         traceCandidateCount,
         traceValidationTruncated,
+        sessionScanTruncated,
         preferredPath = null,
+        preferredTracePath = null,
       ) {
         const options = reports
           .map(({ path }) => `<option value="${escapeHtml(path)}" ${path === preferredPath ? "selected" : ""}>${escapeHtml(path)}</option>`)
           .join("");
         const traceOptions = traces
-          .map(({ path }) => `<option value="${escapeHtml(path)}">${escapeHtml(path)}</option>`)
+          .map(
+            ({ path }) =>
+              `<option value="${escapeHtml(path)}" ${path === preferredTracePath ? "selected" : ""}>${escapeHtml(path)}</option>`,
+          )
+          .join("");
+        const sessionOptions = sessions
+          .map(
+            (session) =>
+              `<option value="${escapeHtml(session.id)}">${escapeHtml(sessionLabel(session))}</option>`,
+          )
           .join("");
         const note = truncated ? "first 2,000 project entries" : `${reports.length} likely report${reports.length === 1 ? "" : "s"}`;
         const traceNote = `${traces.length} validated trace${traces.length === 1 ? "" : "s"}${truncated || traceValidationTruncated ? " · bounded scan" : ""}`;
+        const sessionNote = `${sessions.length} project-matched session${sessions.length === 1 ? "" : "s"}${sessionScanTruncated ? " · bounded scan" : ""} · metadata only`;
         const noTraceCopy = traceCandidateCount
-          ? `${Math.min(traceCandidateCount, MAX_TRACE_CANDIDATES)} project JSONL candidate${Math.min(traceCandidateCount, MAX_TRACE_CANDIDATES) === 1 ? " was" : "s were"} checked; none is a native drift.trace/v1 document.${traceValidationTruncated ? " Additional candidates remain outside the validation bound." : ""} Import a Codex exec stream or add a native trace, then rescan.`
-          : "No project JSONL candidates were found. Import a Codex exec stream or add a native drift.trace/v1 document, then rescan.";
+          ? `${Math.min(traceCandidateCount, MAX_TRACE_CANDIDATES)} project JSONL candidate${Math.min(traceCandidateCount, MAX_TRACE_CANDIDATES) === 1 ? " was" : "s were"} checked; none is a native drift.trace/v1 document.${traceValidationTruncated ? " Additional candidates remain outside the validation bound." : ""} Import a recent matching Codex session above or add a native trace, then rescan.`
+          : "No project JSONL candidates were found. Import a recent matching Codex session above or add a native drift.trace/v1 document, then rescan.";
         const body = reports.length
           ? `<div class="report-head"><span class="path" id="report-path">Select a report</span><span class="count">native validated output</span></div><pre id="report-output" tabindex="0">Choose a report to validate and render.</pre>`
           : `<div class="empty" role="status"><strong>${traces.length ? "No Drift report yet" : "No valid Drift trace found"}</strong><p>${traces.length ? "Choose an existing Drift trace above. The host validates it, asks before disclosure and local writes, then opens the native report." : noTraceCopy}</p><code>${traces.length ? "drift validate trace.jsonl" : 'drift import codex-exec --task "TASK" -o trace.drift.jsonl run.jsonl'}</code></div>`;
-        app.innerHTML = `<header><div><p class="kicker">TRACE / INCIDENT / RECOVERY</p><h1>Drift</h1></div><p class="project">${escapeHtml(context.project.name)} · ${escapeHtml(context.project.id)}</p></header><section class="console"><div class="toolbar"><div class="field"><label for="report-select">Report · ${escapeHtml(note)}</label><select id="report-select" ${reports.length ? "" : "disabled"}>${options || '<option value="">No reports</option>'}</select></div><button id="refresh-reports" type="button">Rescan</button><button class="primary" id="render-report" type="button" ${reports.length ? "" : "disabled"}>Render</button></div><div class="analysis-bar"><div class="field"><label for="trace-select">Drift trace JSONL · ${escapeHtml(traceNote)}</label><select id="trace-select" ${traces.length ? "" : "disabled"}>${traceOptions || '<option value="">No validated traces</option>'}</select></div><button class="primary" id="analyze-trace" type="button" ${traces.length ? "" : "disabled"}>Analyze trace</button></div><div id="report-body">${body}</div></section>`;
+        app.innerHTML = `<header><div><p class="kicker">TRACE / INCIDENT / RECOVERY</p><h1>Drift</h1></div><p class="project">${escapeHtml(context.project.name)} · ${escapeHtml(context.project.id)}</p></header><section class="console"><div class="toolbar"><div class="field"><label for="report-select">Report · ${escapeHtml(note)}</label><select id="report-select" ${reports.length ? "" : "disabled"}>${options || '<option value="">No reports</option>'}</select></div><button id="refresh-reports" type="button">Rescan</button><button class="primary" id="render-report" type="button" ${reports.length ? "" : "disabled"}>Render</button></div><div class="import-bar"><div class="field"><label for="session-select">Recent Codex session · ${escapeHtml(sessionNote)}</label><select id="session-select" ${sessions.length ? "" : "disabled"}>${sessionOptions || '<option value="">No matching sessions</option>'}</select></div><button class="primary" id="import-session" type="button" ${sessions.length ? "" : "disabled"}>Import recent Codex session</button></div><div class="analysis-bar"><div class="field"><label for="trace-select">Drift trace JSONL · ${escapeHtml(traceNote)}</label><select id="trace-select" ${traces.length ? "" : "disabled"}>${traceOptions || '<option value="">No validated traces</option>'}</select></div><button class="primary" id="analyze-trace" type="button" ${traces.length ? "" : "disabled"}>Analyze trace</button></div><div id="report-body">${body}</div></section>`;
         document.querySelector("#refresh-reports").addEventListener("click", () => discover().catch(fail));
+        if (sessions.length) {
+          const sessionSelect = document.querySelector("#session-select");
+          document
+            .querySelector("#import-session")
+            .addEventListener("click", () => importCodexSession(sessionSelect.value));
+        }
         if (traces.length) {
           const traceSelect = document.querySelector("#trace-select");
           document.querySelector("#analyze-trace").addEventListener("click", () => analyzeTrace(traceSelect.value));
@@ -572,15 +739,31 @@
         }
       }
 
-      async function discover(preferredPath = null, fallbackReport = null, generation = null) {
+      async function discover(
+        preferredPath = null,
+        fallbackReport = null,
+        generation = null,
+        preferredTracePath = null,
+      ) {
         if (generation === null) renderGeneration += 1;
         else if (generation !== renderGeneration) return;
         setPluginStatus("busy", null, `Drift · ${context.project.name}`);
-        const tree = await call("project.tree", { depth: 6, limit: 2_000 });
+        const [tree, recentValue] = await Promise.all([
+          call("project.tree", { depth: 6, limit: 2_000 }),
+          call("drift.recentSessions"),
+        ]);
         if (generation !== null && generation !== renderGeneration) return;
+        const recent = recentCodexSessions(recentValue);
         const entries = treeEntries(tree);
         const reports = reportCandidates(entries);
         const candidates = traceCandidates(entries);
+        if (
+          preferredTracePath &&
+          traceRank(preferredTracePath) >= 0 &&
+          !candidates.some(({ path }) => path === preferredTracePath)
+        ) {
+          candidates.unshift({ path: preferredTracePath, kind: "file", rank: traceRank(preferredTracePath) });
+        }
         const boundedCandidates = candidates.slice(0, MAX_TRACE_CANDIDATES);
         const traces = boundedCandidates.length
           ? validatedTraceCandidates(
@@ -597,10 +780,13 @@
         renderConsole(
           reports,
           traces,
+          recent.sessions,
           Array.isArray(tree) && tree.length >= 2_000,
           candidates.length,
           candidates.length > boundedCandidates.length,
+          recent.truncated,
           preferredPath,
+          preferredTracePath,
         );
       }
 

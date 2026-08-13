@@ -10,7 +10,10 @@ use std::{
 
 use drift_observer::{
     DriftError, Report, Result,
-    adapters::codex_exec::{ImportOptions, import as import_codex_exec},
+    adapters::{
+        codex_exec::{ImportOptions, import as import_codex_exec},
+        codex_session::import as import_codex_session,
+    },
     aggregate::{AnalysisRun, aggregate_report},
     json::ensure_unique_keys,
     observer::{ObserverConfig, RUBRIC_VERSION, observe},
@@ -28,14 +31,17 @@ Drift - evidence-grounded agent-session observability
 Usage:
   drift validate TRACE
   drift import codex-exec [OPTIONS] INPUT
+  drift import codex-session [-o PATH] INPUT
   drift analyze [OPTIONS] TRACE
   drift render REPORT
   drift schema trace|judgment|report
 
-Import options:
+Codex exec import options:
       --task TEXT          Original task (required)
       --constraint TEXT    Task constraint; repeatable
       --success TEXT       Success criterion; repeatable
+
+Shared import option:
   -o, --output PATH        Write trace to PATH instead of stdout
 
 Analyze options:
@@ -47,7 +53,7 @@ Analyze options:
       --attempts N         Judgment attempts, including one repair (default: 2)
   -h, --help               Show this help
 
-TRACE is strict drift.trace/v1 JSONL. INPUT is Codex `exec --json` JSONL.
+TRACE is strict drift.trace/v1 JSONL. INPUT is Codex `exec --json` or persisted rollout JSONL.
 Use '-' to read TRACE, INPUT, or REPORT from stdin.
 ";
 
@@ -89,10 +95,17 @@ fn run() -> Result<()> {
     }
 }
 
+#[derive(Debug)]
 struct ImportArgs {
     input: PathBuf,
     output: Option<PathBuf>,
-    options: ImportOptions,
+    format: ImportFormat,
+}
+
+#[derive(Debug)]
+enum ImportFormat {
+    CodexExec(ImportOptions),
+    CodexSession,
 }
 
 fn import_command(args: Vec<OsString>) -> Result<()> {
@@ -106,7 +119,10 @@ fn import_command(args: Vec<OsString>) -> Result<()> {
         ));
     }
     let source = read_bounded_input(&options.input, MAX_FILE_BYTES)?;
-    let trace = import_codex_exec(&source, options.options)?;
+    let trace = match options.format {
+        ImportFormat::CodexExec(import_options) => import_codex_exec(&source, import_options)?,
+        ImportFormat::CodexSession => import_codex_session(&source)?,
+    };
     if let Some(path) = options.output {
         write_atomic(&path, &trace)
     } else {
@@ -121,17 +137,17 @@ fn parse_import_args(args: Vec<OsString>) -> Result<ImportArgs> {
     let Some(format) = args.first().and_then(|value| value.to_str()) else {
         return Err(DriftError::new(
             "E_ARGUMENT",
-            "usage: drift import codex-exec [OPTIONS] INPUT",
+            "usage: drift import codex-exec [OPTIONS] INPUT | drift import codex-session [-o PATH] INPUT",
         ));
     };
     if matches!(format, "-h" | "--help") {
         print!("{USAGE}");
         std::process::exit(0);
     }
-    if format != "codex-exec" {
+    if !matches!(format, "codex-exec" | "codex-session") {
         return Err(DriftError::new(
             "E_ARGUMENT",
-            format!("unknown import format {format:?}; expected 'codex-exec'"),
+            format!("unknown import format {format:?}; expected 'codex-exec' or 'codex-session'"),
         ));
     }
 
@@ -195,21 +211,32 @@ fn parse_import_args(args: Vec<OsString>) -> Result<ImportArgs> {
         index += 1;
     }
     let input = input.ok_or_else(|| DriftError::new("E_ARGUMENT", "missing INPUT"))?;
-    let task = task.ok_or_else(|| DriftError::new("E_ARGUMENT", "missing required --task"))?;
     if output.as_deref() == Some(Path::new("-")) {
         return Err(DriftError::new(
             "E_ARGUMENT",
             "omit --output to write the imported trace to stdout",
         ));
     }
-    Ok(ImportArgs {
-        input,
-        output,
-        options: ImportOptions {
+    let format = if format == "codex-exec" {
+        let task = task.ok_or_else(|| DriftError::new("E_ARGUMENT", "missing required --task"))?;
+        ImportFormat::CodexExec(ImportOptions {
             task,
             constraints,
             success_criteria,
-        },
+        })
+    } else {
+        if task.is_some() || !constraints.is_empty() || !success_criteria.is_empty() {
+            return Err(DriftError::new(
+                "E_ARGUMENT",
+                "codex-session derives its task from the rollout; task contract options are not accepted",
+            ));
+        }
+        ImportFormat::CodexSession
+    };
+    Ok(ImportArgs {
+        input,
+        output,
+        format,
     })
 }
 
@@ -520,7 +547,8 @@ fn required_utf8(args: &[OsString], index: usize, option: &str) -> Result<String
 #[cfg(test)]
 mod tests {
     use super::{
-        JUDGMENT_SCHEMA, REPORT_SCHEMA, TRACE_SCHEMA, parse_analyze_args, parse_import_args,
+        ImportFormat, JUDGMENT_SCHEMA, REPORT_SCHEMA, TRACE_SCHEMA, parse_analyze_args,
+        parse_import_args,
     };
 
     #[test]
@@ -546,9 +574,33 @@ mod tests {
             parsed.output.as_deref().and_then(|path| path.to_str()),
             Some("trace.jsonl")
         );
-        assert_eq!(parsed.options.task, "Check CI");
-        assert_eq!(parsed.options.constraints, ["Read only"]);
-        assert_eq!(parsed.options.success_criteria, ["Report the job result"]);
+        let ImportFormat::CodexExec(options) = parsed.format else {
+            panic!("expected codex-exec format");
+        };
+        assert_eq!(options.task, "Check CI");
+        assert_eq!(options.constraints, ["Read only"]);
+        assert_eq!(options.success_criteria, ["Report the job result"]);
+    }
+
+    #[test]
+    fn parses_codex_session_import_without_task_contract_flags() {
+        let args = ["codex-session", "--output", "trace.jsonl", "rollout.jsonl"]
+            .into_iter()
+            .map(Into::into)
+            .collect();
+        let parsed = parse_import_args(args).unwrap();
+        assert!(matches!(parsed.format, ImportFormat::CodexSession));
+        assert_eq!(parsed.input.to_str(), Some("rollout.jsonl"));
+        assert_eq!(
+            parsed.output.as_deref().and_then(|path| path.to_str()),
+            Some("trace.jsonl")
+        );
+
+        let invalid = ["codex-session", "--task", "Override", "rollout.jsonl"]
+            .into_iter()
+            .map(Into::into)
+            .collect();
+        assert_eq!(parse_import_args(invalid).unwrap_err().code, "E_ARGUMENT");
     }
 
     #[test]

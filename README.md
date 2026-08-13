@@ -41,6 +41,7 @@ shapes change.
 cargo build --release
 target/release/drift import codex-exec --task "Inspect the working directory." \
   -o trace.jsonl examples/codex-exec.source.jsonl
+target/release/drift import codex-session -o recent.drift.jsonl path/to/rollout.jsonl
 target/release/drift validate examples/cwd-quote.jsonl
 target/release/drift analyze examples/cwd-quote.jsonl
 target/release/drift analyze --model MODEL -o report.json examples/cwd-recovered.jsonl
@@ -101,6 +102,25 @@ omitted.
 
 The task/contract comes from CLI arguments because `codex exec --json` does not include the original
 prompt. The source digest detects later byte changes but is not authentication.
+
+## Persisted Codex session import
+
+`codex-session` converts one local Codex rollout without task flags: the first visible user message
+becomes the task. Visible user/assistant `event_msg` records and `response_item` tool calls/results
+are retained. Developer/system messages, compaction payloads, encrypted reasoning, and unrecognized
+record families are excluded; counts of excluded record families remain in the session extension.
+
+```sh
+target/release/drift import codex-session \
+  -o recent.drift.jsonl \
+  path/to/rollout-TIMESTAMP-SESSION_ID.jsonl
+target/release/drift validate recent.drift.jsonl
+```
+
+The adapter accepts interrupted rollouts as `partial`, including linkage warnings. A final Codex
+`task_complete` makes a fully-linked trace structurally `complete` and adds an `unknown` outcome:
+agent transport completion still does not establish task success. Unknown record families are
+omitted rather than interpreted, while malformed imported message/tool records fail closed.
 
 ## Generic trace JSONL
 
