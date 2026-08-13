@@ -14,7 +14,7 @@ fn plugin_manifest_is_static_and_versioned() {
     assert_eq!(manifest["assets"], serde_json::json!([]));
     assert_eq!(
         manifest["capabilities"],
-        serde_json::json!(["project.tree", "drift.render"])
+        serde_json::json!(["project.tree", "drift.render", "drift.analyze"])
     );
     assert!(ENTRY.len() < 100_000);
 }
@@ -26,11 +26,16 @@ fn plugin_entry_uses_v1_channel_and_native_render_contract() {
         "type !== \"in-progress:init\"",
         "apiVersion !== API_VERSION",
         "kind: \"ready\"",
-        "const REQUIRED = [\"project.tree\", \"drift.render\"]",
-        "const RPC_TIMEOUT_MS = 20_000;",
-        "}, RPC_TIMEOUT_MS);",
+        "const REQUIRED = [\"project.tree\", \"drift.render\", \"drift.analyze\"]",
+        "const ANALYZE_TIMEOUT_MS = 21 * 60_000;",
+        "const ANALYSIS_CANCELED = \"Drift analysis canceled by the user\";",
         "call(\"project.tree\", { depth: 6, limit: 2_000 })",
         "call(\"drift.render\", { path })",
+        "call(\"drift.analyze\", { path }, ANALYZE_TIMEOUT_MS)",
+        "Analyze trace",
+        "Drift trace JSONL",
+        "basename.endsWith(\".schema.json\")",
+        "basename.endsWith(\".source.jsonl\")",
         "value.path !== expectedPath",
         "value.text",
         "output.textContent = report.text",

@@ -227,9 +227,9 @@ the CLI protocol does not report the resolved model.
 ## in-progress view
 
 [`plugin/`](plugin/) is a zero-build, self-contained in-progress API 1.0 report view. Configure that
-exact directory as a plugin root. It discovers likely report JSON through `project.tree`, then asks
-the host to render the selected file with the native validator. The iframe never receives raw report
-JSON and cannot run an analysis.
+exact directory as a plugin root. It discovers likely report JSON plus trace JSONL through
+`project.tree`; the host can render a selected report or, after trusted confirmation, analyze one
+selected native trace. The iframe receives paths and rendered text—never raw trace/report JSON.
 
 Discovery calls `project.tree` with `{ "depth": 6, "limit": 2000 }`. Candidates are regular JSON
 files under `.drift/`, in a `reports/` directory, or with `drift`/`report` in the filename. Rendering
@@ -246,6 +246,17 @@ interpolation. Return output only after exit zero; cap input, output, and time. 
 `Invalid Drift report path`, `Drift report not found`, `Drift report is too large`, `Drift render
 timed out`, `Drift report validation failed`, or `Drift executable unavailable`. The UI surfaces
 errors without branching on their text and inserts native output with `textContent`.
+
+`Analyze trace` submits only `{ "path": "trace.jsonl" }` through `drift.analyze`. The trusted host
+validates that exact request, then confirms stable plugin/project identity, trace disclosure to the
+Codex provider, ChatGPT subscription use, and deterministic project-local create/replace output.
+After approval, the host fixes configured Drift/Codex executables, `gpt-5.6-sol`, argv, environment,
+deadline, model attempts, and `.drift/reports/<trace>-<path-digest>.drift.json` destination. It
+canonicalizes the regular input, rejects unsafe output directories/files, serializes analyses per
+canonical project, runs native `analyze`, then native `render`; the result uses the same
+`{ "path", "text" }` shape. A disconnect leaves the admitted analysis running; rescan discovers a
+completed report. Drift validates before provider use, but approved trace content reaches the Codex
+provider and remains embedded in the mode-`0600` report.
 
 Validate the static package from an in-progress checkout:
 

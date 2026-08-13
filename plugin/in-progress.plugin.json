@@ -7,5 +7,5 @@
   "entry": "index.html",
   "assets": [],
   "icon": "sparkles",
-  "capabilities": ["project.tree", "drift.render"]
+  "capabilities": ["project.tree", "drift.render", "drift.analyze"]
 }
