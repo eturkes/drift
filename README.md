@@ -297,6 +297,7 @@ pnpm plugin:validate -- /absolute/path/to/drift/plugin
 cargo fmt --all -- --check
 cargo test --all-targets --locked
 cargo clippy --all-targets --locked -- -D warnings
+cargo deny check
 ```
 
 The interchange is intentionally smaller than current AI telemetry conventions. OpenAI describes
