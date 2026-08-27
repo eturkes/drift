@@ -28,11 +28,15 @@
 ## Engineering
 
 - Elegant, tightly-scoped modular components; deduplicate; KISS + UNIX where apt; refactor proactively.
+- Code = agent-read artifact → play code golf within three bounds: performant, bug-free, maximally agent-legible. Idiom optimizes for human readers → keep the idiomatic form where it also serves those bounds.
+- Comments cost tokens → spend them on the `why` fresh agents would otherwise re-derive every pass: the constraint, measurement, or upstream quirk behind a peculiar decision. Code states the `what` on its own.
 - Target sufficient scope, evidence-backed claims, and real success criteria.
 - Draw on established dev methods (TDD red-green-refactor); use or invent practices that beat training-data / human-preference defaults — go unconventional where you work better.
 - Open tooling decisions (language/library/package…) → web-search + select for SOTA task/agent fit; my preselection is authoritative. Training overweights human-popular convenience. Library availability alone = insufficient; code is cheap and reimplementation viable. Consider agent-oriented languages (agentlanguages.dev) + AI-targeted tooling. Build on mature work when it is genuinely SOTA.
+- Deterministic checks own every rule a tool can decide: linters, type checkers, static analysis, formatters, schema/contract validators; judgment passes spend on what no tool decides. Configure + extend proven checkers first; uncovered invariant → purpose-built check wired into the gate.
 - Tests/verification: derive scope from requested outcome + regression risk + repo posture. Add coverage that accelerates delivery or protects behavior. Fuzzing/property/formal methods require a task-specific advantage.
 - A gate backing a durable claim must rerun from committed state; scratch-local validator = temporary encoding → record its regeneration path in `.agent/memory.md` + schedule the port.
 - Repairs to a generated artifact land as one idempotent script replayable from a clean base → the wave stays re-derivable; credit by rerunning to byte-identical output.
 - Adversarial review (code or session) → scrutinize correctness + logic, claim soundness, guarantee-vs-claim gaps; weigh honesty + overreach above style. Report every issue, incl. uncertain/low-severity; I filter findings.
+- Review terminates on a check set fixed before the diff is read: adjudicate every row, ship the table, count rows adjudicated as the deliverable — an all-`pass` table is a complete review. Findings bind to the change under review; everything outside it reports as a deferred item, and this pass fixes the adjudicated rows alone. An accepted ruling holds until new evidence reverses it, and a fix earns one re-review round against that finding's check alone. Model opinion drifts run to run, so an open-ended review→fix loop flip-flops, creeps scope + injects defects — the fixed set + evidence bar are what make it converge.
 - Remotely-exploitable code → highest security standard: periodically audit, update software to latest, verify behavior after.
