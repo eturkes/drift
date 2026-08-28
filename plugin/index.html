@@ -5,33 +5,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Drift</title>
     <style>
+      @font-face {
+        font-family: "Atkinson Hyperlegible Next";
+        font-style: normal;
+        font-weight: 200 800;
+        font-display: swap;
+        src: url("/plugin-theme/atkinson-hyperlegible-next.woff2") format("woff2");
+      }
+
+      @font-face {
+        font-family: "Iosevka";
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url("/plugin-theme/iosevka.woff2") format("woff2");
+      }
+
       :root {
         color-scheme: dark;
-        --ink: #dce8e7;
-        --muted: #829391;
-        --void: #08100f;
-        --panel: #0d1817;
-        --line: #233532;
-        --signal: #62dfbc;
-        --signal-soft: rgb(98 223 188 / 9%);
-        --amber: #e7bb63;
-        --danger: #f17c73;
-        font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+        --ink: var(--host-text, #e7ecf4);
+        --muted: var(--host-muted, #909cb0);
+        --void: var(--host-background, #0b0e14);
+        --panel: var(--host-surface, #121722);
+        --panel-raised: var(--host-surface-raised, #18202c);
+        --line: var(--host-border, #283142);
+        --signal: var(--host-accent, #67d5b5);
+        --signal-soft: color-mix(in srgb, var(--signal) 12%, transparent);
+        --amber: var(--host-warning, #f2b84b);
+        --danger: var(--host-danger, #ff6b78);
+        --radius-sm: var(--host-radius-small, 6px);
+        --radius-md: var(--host-radius-medium, 10px);
+        --radius-lg: var(--host-radius-large, 14px);
+        font-family: var(--host-ui-font, "Atkinson Hyperlegible Next", sans-serif);
         background: var(--void);
         color: var(--ink);
       }
 
       :root[data-mode="light"] {
         color-scheme: light;
-        --ink: #172522;
-        --muted: #5f716d;
-        --void: #edf4f1;
-        --panel: #f9fcfa;
-        --line: #bacdc7;
-        --signal: #087b5e;
-        --signal-soft: rgb(8 123 94 / 7%);
-        --amber: #8a5c08;
-        --danger: #a73b35;
+        --ink: var(--host-text, #17231f);
+        --muted: var(--host-muted, #65736f);
+        --void: var(--host-background, #f4f7f6);
+        --panel: var(--host-surface, #ffffff);
+        --panel-raised: var(--host-surface-raised, #e9efec);
+        --line: var(--host-border, #c4d0cc);
+        --signal: var(--host-accent, #0b715b);
+        --amber: var(--host-warning, #946000);
+        --danger: var(--host-danger, #b83245);
       }
 
       * {
@@ -41,10 +61,8 @@
       body {
         min-height: 100vh;
         margin: 0;
-        background:
-          linear-gradient(var(--signal-soft) 1px, transparent 1px),
-          linear-gradient(90deg, var(--signal-soft) 1px, transparent 1px), var(--void);
-        background-size: 38px 38px;
+        background: radial-gradient(circle at 50% -14%, var(--signal-soft), transparent 32rem),
+          var(--void);
       }
 
       main {
@@ -70,7 +88,7 @@
       button,
       pre,
       .empty code {
-        font-family: ui-monospace, "Cascadia Code", monospace;
+        font-family: var(--host-mono-font, "Iosevka", monospace);
       }
 
       .kicker {
@@ -83,10 +101,10 @@
 
       h1 {
         margin: 0;
-        font-size: clamp(38px, 7vw, 70px);
-        font-weight: 600;
-        line-height: 0.92;
-        letter-spacing: -0.055em;
+        font-size: clamp(36px, 6vw, 56px);
+        font-weight: 700;
+        line-height: 1;
+        letter-spacing: -0.035em;
       }
 
       .project {
@@ -102,8 +120,9 @@
       .console {
         overflow: hidden;
         border: 1px solid var(--line);
-        background: color-mix(in srgb, var(--panel), transparent 5%);
-        box-shadow: 0 22px 80px rgb(0 0 0 / 18%);
+        border-radius: var(--radius-lg);
+        background: var(--panel);
+        box-shadow: 0 12px 32px color-mix(in srgb, var(--ink) 8%, transparent);
       }
 
       .toolbar {
@@ -132,7 +151,7 @@
 
       .import-bar {
         border-bottom: 1px solid var(--line);
-        background: color-mix(in srgb, var(--amber), transparent 94%);
+        background: color-mix(in srgb, var(--amber) 10%, var(--panel));
       }
 
       .import-bar button {
@@ -156,8 +175,8 @@
       button {
         height: 44px;
         border: 1px solid var(--line);
-        border-radius: 0;
-        background: var(--void);
+        border-radius: var(--radius-sm);
+        background: var(--panel-raised);
         color: var(--ink);
         font-size: 11px;
       }
@@ -174,13 +193,24 @@
       }
 
       button.primary {
-        border-color: color-mix(in srgb, var(--signal), transparent 40%);
-        background: var(--signal-soft);
-        color: var(--signal);
+        border-color: var(--signal);
+        background: var(--signal);
+        color: var(--void);
       }
 
       button:hover:not(:disabled) {
         border-color: var(--signal);
+        background: color-mix(in srgb, var(--panel-raised) 86%, var(--signal));
+      }
+
+      button.primary:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--signal) 86%, var(--ink));
+      }
+
+      button:focus-visible,
+      select:focus-visible {
+        outline: 2px solid var(--signal);
+        outline-offset: 2px;
       }
 
       button:disabled,
@@ -260,7 +290,8 @@
         max-width: 720px;
         padding: 12px;
         border: 1px solid var(--line);
-        background: var(--void);
+        border-radius: var(--radius-sm);
+        background: var(--panel-raised);
         color: var(--amber);
         font-size: 11px;
         overflow-wrap: anywhere;

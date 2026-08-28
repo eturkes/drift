@@ -56,6 +56,10 @@ fn plugin_entry_uses_v1_channel_and_native_render_contract() {
         "value.path !== expectedPath",
         "value.text",
         "output.textContent = report.text",
+        "--host-background",
+        "--host-radius-large",
+        "/plugin-theme/atkinson-hyperlegible-next.woff2",
+        "/plugin-theme/iosevka.woff2",
     ] {
         assert!(
             ENTRY.contains(required),
