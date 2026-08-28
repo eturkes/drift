@@ -16,6 +16,7 @@ fn plugin_manifest_is_static_and_versioned() {
         manifest["capabilities"],
         serde_json::json!([
             "project.tree",
+            "drift.workspace",
             "drift.render",
             "drift.validateTraces",
             "drift.recentSessions",
@@ -35,6 +36,7 @@ fn plugin_entry_uses_v1_channel_and_native_render_contract() {
         "Unsupported or invalid in-progress host API",
         "\"drift.recentSessions\"",
         "\"drift.importSession\"",
+        "call(\"drift.workspace\")",
         "const MAX_TRACE_CANDIDATES = 32;",
         "const IMPORT_TIMEOUT_MS = 75_000;",
         "const ANALYZE_TIMEOUT_MS = 21 * 60_000;",

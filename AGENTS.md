@@ -1,4 +1,4 @@
-# Alignment
+# Drift
 
 ## Collaboration
 
@@ -27,6 +27,8 @@
 
 ## Engineering
 
+- in-progress plugin/integration paths must mount target repositories read-only. Host-configured
+  external roots own writes; standalone coding-agent or Terminal workflows own repo mutation.
 - Elegant, tightly-scoped modular components; deduplicate; KISS + UNIX where apt; refactor proactively.
 - Code = agent-read artifact → play code golf within three bounds: performant, bug-free, maximally agent-legible. Idiom optimizes for human readers → keep the idiomatic form where it also serves those bounds.
 - Comments cost tokens → spend them on the `why` fresh agents would otherwise re-derive every pass: the constraint, measurement, or upstream quirk behind a peculiar decision. Code states the `what` on its own.

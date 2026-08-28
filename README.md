@@ -247,38 +247,44 @@ the CLI protocol does not report the resolved model.
 ## in-progress view
 
 [`plugin/`](plugin/) is a zero-build, self-contained in-progress API 1.0 report view. Configure that
-exact directory as a plugin root. It discovers likely report JSON plus JSONL candidates through
-`project.tree`, then asks the host to retain only candidates accepted by native `drift validate`.
-The host can render a selected report or, after trusted confirmation, analyze one selected valid
-trace. The iframe receives paths, validity, and rendered text—never raw trace/report JSON.
+exact directory as a plugin root. It combines repository candidates from `project.tree` with private
+external paths from `drift.workspace`. The host retains only candidates accepted by native
+`drift validate`. It can render a selected report or analyze one selected valid trace after trusted
+confirmation. The iframe receives paths, validity, and rendered text—never raw trace/report JSON.
 
-Discovery calls `project.tree` with `{ "depth": 6, "limit": 2000 }`. Candidates are regular JSON
-files under `.drift/`, in a `reports/` directory, or with `drift`/`report` in the filename. Rendering
-uses this RPC:
+Discovery calls `project.tree` with `{ "depth": 6, "limit": 2000 }`. Repository candidates are
+regular JSON files under `.drift/`, in a `reports/` directory, or with `drift`/`report` in the
+filename. External virtual paths use `.in-progress/drift/{traces,reports}/...`; they never resolve
+beneath the repository. Rendering uses this RPC:
 
 ```json
 {"kind": "request", "id": "…", "method": "drift.render", "params": {"path": "session.drift.json"}}
 ```
 
 The successful result is exactly `{ "path": "session.drift.json", "text": "native output…" }`.
-The host must bind the project root, accept only a tree-returnable relative regular-file path,
-reject absolute/traversing/symlink-escaping paths, and invoke `drift render` directly without shell
-interpolation. Return output only after exit zero; cap input, output, and time. Safe RPC errors are
+The host must bind the project root and accept only a tree-returnable or selected-project virtual
+regular-file path. It must reject absolute, traversing, and symlink-escaping paths. It invokes
+`drift render` directly without shell interpolation. Return output only after exit zero; cap input,
+output, and time. Safe RPC errors are
 `Invalid Drift report path`, `Drift report not found`, `Drift report is too large`, `Drift render
 timed out`, `Drift report validation failed`, or `Drift executable unavailable`. The UI surfaces
 errors without branching on their text and inserts native output with `textContent`.
 
-Discovery submits at most 32 unique project-relative candidates through read-only
-`drift.validateTraces`; the host canonicalizes each regular project file, runs bounded native
-validation, and returns only valid paths. Arbitrary JSONL, including Align journals and raw Codex
-streams, never enables analysis.
+Discovery submits at most 32 unique repository or virtual candidates through read-only
+`drift.validateTraces`. The host resolves each regular file, runs bounded native validation, and
+returns only valid paths. Arbitrary JSONL, including Align journals and raw Codex streams, never
+enables analysis.
+
+`drift.recentSessions` lists bounded metadata for matching local Codex sessions. Confirmed
+`drift.importSession` publishes a mode-`0600` virtual trace under external private state. Import is
+local and model-free. It cannot create `.drift` in the repository.
 
 `Analyze trace` submits only `{ "path": "trace.jsonl" }` through `drift.analyze`. The trusted host
 validates that exact request, then confirms stable plugin/project identity, trace disclosure to the
-Codex provider, ChatGPT subscription use, and deterministic project-local create/replace output.
+Codex provider, ChatGPT subscription use, and deterministic external create/replace output.
 After approval, the host fixes configured Drift/Codex executables, `gpt-5.6-sol`, argv, environment,
-deadline, model attempts, and `.drift/reports/<trace>-<path-digest>.drift.json` destination. It
-canonicalizes and prevalidates the regular input before creating output directories, rejects unsafe
+deadline, model attempts, and `.in-progress/drift/reports/<trace>-<digest>.drift.json` virtual
+destination. It resolves and prevalidates the regular input before creating output directories, rejects unsafe
 output directories/files, serializes analyses per canonical project, runs native `analyze`, then
 native `render`; the result uses the same
 `{ "path", "text" }` shape. A disconnect leaves the admitted analysis running; rescan discovers a

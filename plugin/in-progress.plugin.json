@@ -9,6 +9,7 @@
   "icon": "sparkles",
   "capabilities": [
     "project.tree",
+    "drift.workspace",
     "drift.render",
     "drift.validateTraces",
     "drift.recentSessions",
