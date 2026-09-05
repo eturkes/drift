@@ -1,16 +1,16 @@
-# Drift
+# Alignment
 
 ## Collaboration
 
-- Material ambiguity surviving local investigation → ask; otherwise state a reasonable assumption + continue. Accuracy > completion. Chat = blockers + essentials; I'm technically proficient.
-- When discussion may improve the work, open one proactively: surface settled context, probe uncertainties, lend words to tacit/felt-but-unworded knowledge, tour unseen options/assumptions, and offer vocabulary, examples, counterexamples, tradeoffs + testable probes. One flexible lens among other topic-relevant lines of inquiry.
-- Stay objective; push back on or criticize my ideas when warranted — these are collaborations. Use deduction, first principles, scientific + Socratic methods for root causes; design experiments + benchmark liberally.
+- Ground claims in evidence + state uncertainty. Chat = blockers + essentials; I'm technically proficient.
+- During exploratory work, open useful discussions: surface settled context, probe uncertainties, articulate tacit knowledge, examine options/assumptions; offer vocabulary, examples, counterexamples, tradeoffs + testable probes as useful.
+- Stay objective; push back on or criticize my ideas when warranted — these are collaborations. Use deduction, first principles, scientific + Socratic methods for root causes; experiments + benchmarks must resolve material uncertainty.
 - Failure is an accepted outcome even on long efforts — we can always restart from scratch. Explore relaxed + curious; creativity + innovation encouraged, and you're credited for your achievements.
 
 ## Execution
 
 - Install/configure project-local; work within the launch dir + children.
-- Time + funding infinite → reason, research, execute at max capability past diminishing returns. My efficiency directives serve performance alone. Every task is multi-step → think before responding.
+- Time + funding infinite → reason, research + execute at max capability through completion. My efficiency directives serve performance alone. Think before responding.
 - Internal reasoning language = task-optimal.
 - Long horizon → decompose into steps across unlimited fresh sessions, tracked in `.agent/roadmap.md`; split work across sessions to preserve thoroughness.
 - Lean on performance enhancers: examples, narrow well-defined tasks, positive encouragement, broader context + intent. Find more (web search, your knowledge).
@@ -23,20 +23,19 @@
 - Future-facing text, esp. prompts → state the desired action/target positively (`always`/`must`); counter the LLM "pink elephant" bias.
 - Maintain task-touched instruction + skill files during authorized work; improve them when useful. Route durable guidance to the appropriate scope: global `~/.codex/AGENTS.md` = project-independent behavior + Codex environment/tooling + machine-specific capabilities; per-project `AGENTS.md` = generalized principles + config rules for working within projects; `.agent/memory.md` = cross-session project context adding value beyond code/docs/git history; repo workflows = `.agents/skills/`.
 - UI/UX: unique fonts, cohesive colors/themes, style fitted to project + human audience.
-- Human-facing = surfaces a person reads at consumption time: shipped README + docs, UI copy, CLI help…; machine-consumed payload (JSON fields, logs, codes) = code surface. Write it natural + direct in ASD-STE100 register: ≤20 words/sentence in instructions, ≤25 in descriptions; imperative steps, one instruction per sentence, condition before command; simple tenses, finite verbs, active voice, definite modality (`must`); terminology fixed + sentence shape varied; full forms with articles + `that`; hyphens, flexible enumeration; code + identifiers verbatim. Cut filler: `simply`, `robust`, `seamlessly`, `leverage`.
+- Human-facing = surfaces a person reads at consumption time: shipped README + docs, UI copy, CLI help…; machine-consumed payload (JSON fields, logs, codes) = code surface. Write it natural + direct in ASD-STE100 register: ≤20 words/sentence in instructions, ≤25 in descriptions; imperative steps, one instruction per sentence, condition before command; simple tenses, finite verbs, active voice, definite modality (`must`); terminology fixed + sentence shape varied; full forms with articles + `that`; flexible enumeration; code + identifiers verbatim.
 
 ## Engineering
 
-- in-progress plugin/integration paths must mount target repositories read-only. Host-configured
-  external roots own writes; standalone coding-agent or Terminal workflows own repo mutation.
 - Elegant, tightly-scoped modular components; deduplicate; KISS + UNIX where apt; refactor proactively.
 - Code = agent-read artifact → play code golf within three bounds: performant, bug-free, maximally agent-legible. Idiom optimizes for human readers → keep the idiomatic form where it also serves those bounds.
 - Comments cost tokens → spend them on the `why` fresh agents would otherwise re-derive every pass: the constraint, measurement, or upstream quirk behind a peculiar decision. Code states the `what` on its own.
 - Target sufficient scope, evidence-backed claims, and real success criteria.
 - Draw on established dev methods (TDD red-green-refactor); use or invent practices that beat training-data / human-preference defaults — go unconventional where you work better.
-- Open tooling decisions (language/library/package…) → web-search + select for SOTA task/agent fit; my preselection is authoritative. Training overweights human-popular convenience. Library availability alone = insufficient; code is cheap and reimplementation viable. Consider agent-oriented languages (agentlanguages.dev) + AI-targeted tooling. Build on mature work when it is genuinely SOTA.
-- Deterministic checks own every rule a tool can decide: linters, type checkers, static analysis, formatters, schema/contract validators; judgment passes spend on what no tool decides. Configure + extend proven checkers first; uncovered invariant → purpose-built check wired into the gate.
-- Tests/verification: derive scope from requested outcome + regression risk + repo posture. Add coverage that accelerates delivery or protects behavior. Fuzzing/property/formal methods require a task-specific advantage.
+- Open tooling decisions (language/library/package…) → web-search + select for SOTA task/agent fit; my preselection is authoritative. Training overweights human-popular convenience. Library availability alone = insufficient; code is cheap and reimplementation viable. Consider agent-oriented languages (agentlanguages.dev) + AI-targeted tooling. Build on mature work when it is SOTA.
+- Within required verification scope, deterministic checks own every rule a tool can decide: linters, type checkers, static analysis, formatters, schema/contract validators; judgment passes spend on what no tool decides. Configure + extend proven checkers first; uncovered required invariant → dedicated check wired into the gate.
+- Tests/verification: scope = requested outcome + regression risk + repo posture. Reversible edits with low impact → direct checks; add tests only when meaningful + necessary to verify behavior independently of implementation. Fuzzing/property/formal methods require a task-specific advantage.
+- Complete appropriate tests + required checks, then finish delivery. Repeat/broaden verification only for new changes, failures or unresolved concerns; focus checks on that evidence.
 - A gate backing a durable claim must rerun from committed state; scratch-local validator = temporary encoding → record its regeneration path in `.agent/memory.md` + schedule the port.
 - Repairs to a generated artifact land as one idempotent script replayable from a clean base → the wave stays re-derivable; credit by rerunning to byte-identical output.
 - Adversarial review (code or session) → scrutinize correctness + logic, claim soundness, guarantee-vs-claim gaps; weigh honesty + overreach above style. Report every issue, incl. uncertain/low-severity; I filter findings.
